@@ -383,27 +383,38 @@ function SPARQL_LastModels(number) {
         SELECT  ?id ?date ?title (GROUP_CONCAT(?orcid;separator=", ") AS ?orcids) (GROUP_CONCAT(?name;separator=", ") AS ?names)
         WHERE 
         {
-            ?cam metago:graphType ?type .
-            FILTER(?type in (metago:ontology, metago:noctuaCam))
-            ?cam 
-                 <http://www.geneontology.org/formats/oboInOwl#id> ?id ;
-                 dc:title ?title ;
-                 dc:date ?date ;
-                 dc:contributor ?orcid .
+          	GRAPH ?cam {
+                            
+	            ?cam metago:graphType metago:noctuaCam .
+              
+        	    ?cam dc:title ?title ;
+    	             dc:date ?date ;
+        	         dc:contributor ?orcid .
             
-            BIND( IRI(?orcid) AS ?orcidIRI ).
-            
-            optional { ?orcidIRI rdfs:label ?name }
+	            BIND( IRI(?orcid) AS ?orcidIRI ).
           
+    	      	optional { ?cam <http://www.geneontology.org/formats/oboInOwl#id> ?id }
+        	
+              	# Baby Proofing the query since oboInOwl#id is not always there
+	  			BIND(IF(bound(?id), ?id, concat("gomodel:", substr(str(?cam), 31))) as ?id) .
+          
+          }
+          
+          optional { ?orcidIRI rdfs:label ?name }
+	  	  BIND(IF(bound(?name), ?name, ?orcid) as ?name) .
+
+
         }   
-    GROUP BY ?id ?date ?title
+    GROUP BY ?id ?date ?title ?cam
     ORDER BY DESC(?date)
     LIMIT ` + number + `
     `);
     return "?query=" + encoded;
 }
 
-/* Get the Detailed Information about a User */
+/* Get the Detailed Information about a User 
+    SYNGO: does require for now post-processing of the results
+            with the SynGO user - mapping */
 function SPARQL_UserMetaData(orcid) {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
@@ -428,7 +439,9 @@ function SPARQL_UserMetaData(orcid) {
     return "?query=" + encoded;
 }
 
-/* Get the list of Users */
+/*  Get the list of Users.
+    SYNGO: does require for now post-processing of the results
+            with the SynGO user - mapping */
 function SPARQL_UserList() {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
@@ -456,6 +469,8 @@ function SPARQL_UserList() {
     return "?query=" + encoded;
 }
 
+
+/* SYNGO: works but the title are not expressive */
 function SPARQL_ModelList() {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
@@ -473,6 +488,7 @@ function SPARQL_ModelList() {
     return "?query=" + encoded;
 }
 
+
 function SPARQL_AnnotatedModelList() {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
@@ -482,22 +498,29 @@ function SPARQL_AnnotatedModelList() {
         SELECT  ?id ?date ?title (GROUP_CONCAT(?orcid;separator=", ") AS ?orcids) (GROUP_CONCAT(?name;separator=", ") AS ?names)
         WHERE 
         {
-            ?cam metago:graphType ?type .
-            FILTER(?type in (metago:ontology, metago:noctuaCam))
-            ?cam 
-                 <http://www.geneontology.org/formats/oboInOwl#id> ?id ;
-                 dc:title ?title ;
-                 dc:date ?date ;
-                 dc:contributor ?orcid .
+          	GRAPH ?cam {
+                            
+	            ?cam metago:graphType metago:noctuaCam .
+              
+        	    ?cam dc:title ?title ;
+    	             dc:date ?date ;
+        	         dc:contributor ?orcid .
             
-            BIND( IRI(?orcid) AS ?orcidIRI ).
-            
-            optional { ?orcidIRI rdfs:label ?name }
+	            BIND( IRI(?orcid) AS ?orcidIRI ).
+          
+    	      	optional { ?cam <http://www.geneontology.org/formats/oboInOwl#id> ?id }
+        	
+              	# Baby Proofing the query since oboInOwl#id is not always there
+	  			BIND(IF(bound(?id), ?id, concat("gomodel:", substr(str(?cam), 31))) as ?id) .
+          
+          }
+          
+          optional { ?orcidIRI rdfs:label ?name }
+	  	  BIND(IF(bound(?name), ?name, ?orcid) as ?name) .
 
-			BIND(IF(bound(?name), ?name, ?orcidIRI) as ?name) .  
-  
+
         }   
-    GROUP BY ?id ?date ?title
+    GROUP BY ?id ?date ?title ?cam
     ORDER BY DESC(?date)
     `);
 
@@ -505,7 +528,7 @@ function SPARQL_AnnotatedModelList() {
     return "?query=" + encoded;
 }
 
-/* Get the GO-CAMs made by a User */
+/* Get the GO-CAMs made by a User. Does work with SYNGO */
 function SPARQL_UserModels(orcid) {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
@@ -525,6 +548,7 @@ function SPARQL_UserModels(orcid) {
 }
 
 
+/* Does work with SYNGO */
 function SPARQL_GetModel(id) {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
@@ -541,6 +565,7 @@ function SPARQL_GetModel(id) {
     return "?query=" + encoded;
 }
 
+/* Does NOT work with SYNGO, but more because there is no data available ? */
 function SPARQL_GetModelGPs(id) {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
@@ -554,10 +579,10 @@ function SPARQL_GetModelGPs(id) {
     SELECT ?identifier ?oboid ?name ?taxon ?species (COUNT(?identifier) AS ?usages)
     WHERE {
       
-      GRAPH metago:5900dc7400000968 {
+      GRAPH metago:` + id + ` {
             ?s enabled_by: ?id .    
             ?id rdf:type ?identifier .
-            FILTER(!contains(str(?identifier), "NamedIndividual")) .
+        	FILTER(?identifier != owl:NamedIndividual) .
       }
       
       ?identifier <http://www.geneontology.org/formats/oboInOwl#id> ?obj .
@@ -650,30 +675,14 @@ function SPARQL_GetModelCCs(id) {
 }
 
 
+/* TODO */
 function SPARQL_GetModelDetails(id) {
     var encoded = encodeURIComponent(`
-    PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
-    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    PREFIX metago: <http://model.geneontology.org/>
-    
-    SELECT distinct ?GO ?type ?label 
-    WHERE {
-        GRAPH metago:` + id + ` {
-            ?s rdf:type ?GO .
-            filter(contains(str(?GO), "obo/GO")) .
-        }
-      
-        ?GO <http://www.geneontology.org/formats/oboInOwl#hasOBONamespace> ?type;
-              rdfs:label ?label .
-      
-        filter((contains(?type, "molecular_function")))
-    
-    } 
     `);
     return "?query=" + encoded;
 }
 
-
+/* Works with SYNGO */
 function SPARQL_GetModelRelations(id) {
     var encoded = encodeURIComponent(`
     PREFIX : <http://model.geneontology.org/>
@@ -813,3 +822,4 @@ function SPARQL_GetModelGOTerms(id) {
     `);
     return "?query=" + encoded;
 }
+

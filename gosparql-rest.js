@@ -55,7 +55,7 @@ function handleUsers(parameter, property, callback) {
         GetJSON(url, transformUserList, callback);
 
     } else {
-        switch(property) {
+        switch (property) {
             case "models":
                 url = baseUrl + SPARQL_UserModels(parameter);
                 GetJSON(url, transformUserModels, callback);
@@ -79,7 +79,7 @@ function handleModels(parameter, property, callback) {
     } else {
 
         if (property == null) {
-            switch(parameter) {
+            switch (parameter) {
                 case "annotatedlist":
                     url = baseUrl + SPARQL_AnnotatedModelList();
                     GetJSON(url, transformAnnotatedModelList, callback);
@@ -91,14 +91,14 @@ function handleModels(parameter, property, callback) {
             }
 
         } else {
-            switch(parameter) {
-                case "last":                 
+            switch (parameter) {
+                case "last":
                     url = baseUrl + SPARQL_LastModels(property);
                     GetJSON(url, transformAnnotatedModelList, callback);
                     break;
                 default:
-                    switch(property) {
-                        case "geneproducts": 
+                    switch (property) {
+                        case "geneproducts":
                             url = baseUrl + SPARQL_GetModelGPs(parameter);
                             GetJSON(url, transformModelGPs, callback);
                             break;
@@ -188,8 +188,8 @@ function transformUser(json, resultCallback) {
     var jsmodified = json.map(function (item) {
         return {
             "name": item.name.value,
-            "organizations": item.organizations? item.organizations.value.split(", ") : "N/A",
-            "affiliations": item.affiliations? item.affiliations.value.split(", ") : "N/A",
+            "organizations": item.organizations ? item.organizations.value.split(", ") : "N/A",
+            "affiliations": item.affiliations ? item.affiliations.value.split(", ") : "N/A",
             "gocams": item.cams.value
         }
     });
@@ -217,9 +217,9 @@ function transformUserList(json, resultCallback) {
     var jsmodified = json.map(function (item) {
         return {
             "orcid": item.orcid.value,
-            "name": item.name? item.name.value : "N/A",
-            "organizations": item.organizations? item.organizations.value.split(", ") : "N/A",
-            "affiliations": item.affiliations? item.affiliations.value.split(", ") : "N/A",
+            "name": item.name ? item.name.value : "N/A",
+            "organizations": item.organizations ? item.organizations.value.split(", ") : "N/A",
+            "affiliations": item.affiliations ? item.affiliations.value.split(", ") : "N/A",
             "gocams": item.cams.value
         }
     });
@@ -248,8 +248,8 @@ function transformAnnotatedModelList(json, resultCallback) {
             "gocam": item.id.value,
             "date": item.date.value,
             "title": item.title.value.trim(),
-            "orcids": item.orcids? item.orcids.value.split(", ") : "N/A",
-            "names": item.names? item.names.value.split(", ") : "N/A"
+            "orcids": item.orcids ? item.orcids.value.split(", ") : "N/A",
+            "names": item.names ? item.names.value.split(", ") : "N/A"
         }
     });
 
@@ -274,7 +274,7 @@ function transformModel(json, resultCallback) {
 function transformModelGPs(json, resultCallback) {
     var jsmodified = json.map(function (item) {
         return {
-            "identifier": item.identifier.value.indexOf("MGI:MGI")? item.identifier.value.replace("MGI:MGI", "MGI") : item.identifier.value,
+            "identifier": item.identifier.value.indexOf("MGI:MGI") ? item.identifier.value.replace("MGI:MGI", "MGI") : item.identifier.value,
             "oboid": item.oboid.value,
             "name": item.name.value,
             "taxon": item.taxon.value,
@@ -348,8 +348,8 @@ function transformModelContributors(json, resultCallback) {
             "name": item.name.value,
             "providersURL": item.providersURL ? item.providersURL.value.split(", ") : "N/A",
             "providersName": item.providersName ? item.providersName.value.split(", ") : "N/A",
-            "organizations": item.organizations? item.organizations.value.split(", ") : "N/A",
-            "affiliations": item.organizations? item.affiliations.value.split(", ") : "N/A"
+            "organizations": item.organizations ? item.organizations.value.split(", ") : "N/A",
+            "affiliations": item.organizations ? item.affiliations.value.split(", ") : "N/A"
         }
     });
 
@@ -420,18 +420,27 @@ function SPARQL_UserMetaData(orcid) {
     PREFIX metago: <http://model.geneontology.org/>
     PREFIX dc: <http://purl.org/dc/elements/1.1/>
     PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> 
-        
-    SELECT  ?name (GROUP_CONCAT(distinct ?organization;separator=", ") AS ?organizations) (GROUP_CONCAT(distinct ?affiliation;separator=", ") AS ?affiliations) (COUNT(distinct ?cam) AS ?cams)
+	PREFIX has_affiliation: <http://purl.obolibrary.org/obo/ERO_0000066> 
+	PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+
+    SELECT  ?name 	(GROUP_CONCAT(distinct ?organization;separator=", ") AS ?organizations) 
+					(GROUP_CONCAT(distinct ?affiliation;separator=", ") AS ?affiliations) 
+					(GROUP_CONCAT(distinct ?camId;separator=", ") AS ?gocams)
+					(GROUP_CONCAT(distinct ?camTitle;separator=", ") AS ?gocamsTitle)
+					(GROUP_CONCAT(distinct ?date;separator=", ") AS ?gocamsDate)
         WHERE 
         {
             BIND("http://orcid.org/` + orcid + `"^^xsd:string as ?orcid) .
             BIND(IRI(?orcid) as ?orcidIRI) .
-          
-            ?cam metago:graphType ?type .
-            FILTER(?type in (metago:ontology, metago:noctuaCam))
+           
+            ?cam metago:graphType metago:noctuaCam .
+  			?cam obo:id ?camId .
+  			?cam dc:date ?date .
+  			?cam dc:title ?camTitle .
+  
             optional { ?orcidIRI rdfs:label ?name } .
             optional { ?orcidIRI <http://www.w3.org/2006/vcard/ns#organization-name> ?organization } .
-            optional { ?orcidIRI <http://purl.obolibrary.org/obo/ERO_0000066> ?affiliation } .
+            optional { ?orcidIRI has_affiliation: ?affiliation } .
             ?cam dc:contributor ?orcid .
         }
     GROUP BY ?orcid ?name 
@@ -446,20 +455,20 @@ function SPARQL_UserList() {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
     PREFIX dc: <http://purl.org/dc/elements/1.1/>
-    PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> 
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+	PREFIX has_affiliation: <http://purl.obolibrary.org/obo/ERO_0000066> 
 
     SELECT  ?orcid ?name (GROUP_CONCAT(distinct ?organization;separator=", ") AS ?organizations) (GROUP_CONCAT(distinct ?affiliation;separator=", ") AS ?affiliations) (COUNT(?cam) AS ?cams)
     WHERE 
     {
-        ?cam metago:graphType ?type .
-        FILTER(?type in (metago:ontology, metago:noctuaCam))
+        ?cam metago:graphType metago:noctuaCam .
         ?cam dc:contributor ?orcid .
         
         BIND( IRI(?orcid) AS ?orcidIRI ).
         
         optional { ?orcidIRI rdfs:label ?name } .
         optional { ?orcidIRI <http://www.w3.org/2006/vcard/ns#organization-name> ?organization } .
-        optional { ?orcidIRI <http://purl.obolibrary.org/obo/ERO_0000066> ?affiliation } .
+        optional { ?orcidIRI has_affiliation: ?affiliation } .
   
   		BIND(IF(bound(?name), ?name, ?orcid) as ?name) .
   
@@ -524,7 +533,7 @@ function SPARQL_AnnotatedModelList() {
     ORDER BY DESC(?date)
     `);
 
-//    console.log("*** Using the sparql " , encoded);
+    //    console.log("*** Using the sparql " , encoded);
     return "?query=" + encoded;
 }
 
@@ -823,3 +832,70 @@ function SPARQL_GetModelGOTerms(id) {
     return "?query=" + encoded;
 }
 
+
+function SPARQL_GetGroupUsers(group) {
+    var groupURI = getURI(group);
+    var encoded = encodeURIComponent(`
+    PREFIX metago: <http://model.geneontology.org/>
+    PREFIX dc: <http://purl.org/dc/elements/1.1/>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
+	PREFIX has_affiliation: <http://purl.obolibrary.org/obo/ERO_0000066> 
+	PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+
+    SELECT  distinct ?affiliation ?name (GROUP_CONCAT(distinct ?orcids; separator=", ") as ?membersOrcid) 
+	    								(GROUP_CONCAT(distinct ?members; separator=", ") as ?membersName)
+		    							(GROUP_CONCAT(distinct ?cam; separator=", ") as ?modelsList)
+			    						(GROUP_CONCAT(distinct ?title; separator=", ") as ?titlesList)
+    WHERE 
+    {
+        ?cam metago:graphType metago:noctuaCam .
+        ?cam dc:contributor ?orcid .
+  		?cam obo:id ?model .
+        ?cam dc:title ?title .
+  
+        BIND( IRI(?orcid) AS ?orcidIRI ).
+      
+        ?orcidIRI has_affiliation: ?affiliation .
+  		?affiliation rdfs:label ?name .
+  
+  		?orcids has_affiliation: ?affiliation .
+		?orcids rdfs:label ?members .
+  
+    }
+	GROUP BY ?affiliation ?name
+    `);
+    return "?query=" + encoded;
+}
+
+
+
+
+/*
+function SPARQL_GetGroupUsers(group) {
+    var groupURI = getURI(group);
+    var encoded = encodeURIComponent(`
+        PREFIX has_affiliation: <http://purl.obolibrary.org/obo/ERO_0000066>
+        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    
+        select (GROUP_CONCAT(distinct ?names;separator=", ") AS ?membersName) (GROUP_CONCAT(distinct ?orcids;separator=", ") AS ?membersOrcid)
+        where {
+            BIND(` + groupURI + ` as ?affiliation) .
+            ?orcids has_affiliation: ?affiliation .
+              ?orcids rdfs:label ?names
+        }    
+        `);
+    return "?query=" + encoded;
+}
+*/
+
+
+function getURI(stringParam) {
+    var mod;
+    if (!stringParam.startsWith("<")) {
+        mod = "<" + stringParam;
+    }
+    if (!stringParam.startsWith(">")) {
+        mod = stringParam + ">";
+    }
+    return mod;
+}

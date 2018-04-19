@@ -16,7 +16,7 @@ exports.handler = function (event, context, callback) {
     }
 
     if (resource == "stats") {
-        handleStats(paremeter, property, callback);
+        handleStats(parameter, property, callback);
 
     } else if (resource == "users") {
         handleUsers(parameter, property, callback);
@@ -190,7 +190,14 @@ function transformUser(json, resultCallback) {
             "name": item.name.value,
             "organizations": item.organizations ? item.organizations.value.split(", ") : "N/A",
             "affiliations": item.affiliations ? item.affiliations.value.split(", ") : "N/A",
-            "gocams": item.cams.value
+            "gocams": item.gocams? item.gocams.value.split(", ") : "N/A",
+            "gocamsDate": item.gocamsDate? item.gocamsDate.value.split(", ") : "N/A",
+            "gocamsTitle": item.gocamsTitle? splitTrim(item.gocamsTitle.value, ", ") : "N/A",
+            "gpNames": item.gpNames? item.gpNames.value.split(", ") : "N/A",
+            "gpIDs": item.gpIDs? item.gpIDs.value.split(", ") : "N/A",
+            "bpNames": item.bpNames? item.bpNames.value.split(", ") : "N/A",
+            "bpIDs": item.bpIDs? item.bpIDs.value.split(", ") : "N/A",
+            "speciesList": item.speciesList? item.speciesList.value.split(", ") : "N/A"
         }
     });
 
@@ -421,28 +428,70 @@ function SPARQL_UserMetaData(orcid) {
     PREFIX dc: <http://purl.org/dc/elements/1.1/>
     PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> 
 	PREFIX has_affiliation: <http://purl.obolibrary.org/obo/ERO_0000066> 
+	PREFIX enabled_by: <http://purl.obolibrary.org/obo/RO_0002333>
 	PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+	PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+	PREFIX owl: <http://www.w3.org/2002/07/owl#>
 
     SELECT  ?name 	(GROUP_CONCAT(distinct ?organization;separator=", ") AS ?organizations) 
 					(GROUP_CONCAT(distinct ?affiliation;separator=", ") AS ?affiliations) 
 					(GROUP_CONCAT(distinct ?camId;separator=", ") AS ?gocams)
 					(GROUP_CONCAT(distinct ?camTitle;separator=", ") AS ?gocamsTitle)
 					(GROUP_CONCAT(distinct ?date;separator=", ") AS ?gocamsDate)
+					(GROUP_CONCAT(distinct ?gpName;separator=", ") AS ?gpNames)
+					(GROUP_CONCAT(distinct ?identifier;separator=", ") AS ?gpIDs)
+					(GROUP_CONCAT(distinct ?species;separator=", ") AS ?speciesList)
+					(GROUP_CONCAT(distinct ?GO;separator=", ") AS ?bpIDs)
+					(GROUP_CONCAT(distinct ?GOLabel;separator=", ") AS ?bpNames)
         WHERE 
         {
             BIND("http://orcid.org/` + orcid + `"^^xsd:string as ?orcid) .
             BIND(IRI(?orcid) as ?orcidIRI) .
            
+  			# Getting some information on the model
             ?cam metago:graphType metago:noctuaCam .
   			?cam obo:id ?camId .
   			?cam dc:date ?date .
   			?cam dc:title ?camTitle .
   
+  			# Getting some information on the contributor
             optional { ?orcidIRI rdfs:label ?name } .
             optional { ?orcidIRI <http://www.w3.org/2006/vcard/ns#organization-name> ?organization } .
             optional { ?orcidIRI has_affiliation: ?affiliation } .
-            ?cam dc:contributor ?orcid .
-        }
+  
+  
+  			# Getting some information on the model itself
+            ?cam dc:contributor ?orcid .  
+  			GRAPH ?cam {
+    			?s enabled_by: ?id .
+        		?id rdf:type ?identifier .
+		        FILTER(?identifier != owl:NamedIndividual) .
+        		
+    			?s2 rdf:type ?GO .
+		        filter(contains(str(?GO), "obo/GO")) .
+    
+  			}
+  
+  			# Getting some information on the model GPs
+  			?identifier obo:id ?obj .
+  			?oboid obo:id ?obj .
+		    FILTER (contains(str(?oboid), "/obo/")) .    
+      
+      		?oboid rdfs:subClassOf ?v0 . 
+      		?v0 owl:onProperty <http://purl.obolibrary.org/obo/RO_0002162> . 
+      		?v0 owl:someValuesFrom ?taxon .
+      
+      		?oboid rdfs:label ?gpName .
+      		?taxon rdfs:label ?species .
+
+
+  			# Getting some information on BPs
+        	?GO obo:hasOBONamespace ?type;
+            	rdfs:label ?GOLabel .
+      
+        	filter((contains(?type, "biological_process")))  
+  
+    }
     GROUP BY ?orcid ?name 
     `);
     return "?query=" + encoded;
@@ -870,23 +919,11 @@ function SPARQL_GetGroupUsers(group) {
 
 
 
-/*
-function SPARQL_GetGroupUsers(group) {
-    var groupURI = getURI(group);
-    var encoded = encodeURIComponent(`
-        PREFIX has_affiliation: <http://purl.obolibrary.org/obo/ERO_0000066>
-        PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
-    
-        select (GROUP_CONCAT(distinct ?names;separator=", ") AS ?membersName) (GROUP_CONCAT(distinct ?orcids;separator=", ") AS ?membersOrcid)
-        where {
-            BIND(` + groupURI + ` as ?affiliation) .
-            ?orcids has_affiliation: ?affiliation .
-              ?orcids rdfs:label ?names
-        }    
-        `);
-    return "?query=" + encoded;
-}
-*/
+
+
+
+
+
 
 
 function getURI(stringParam) {
@@ -898,4 +935,12 @@ function getURI(stringParam) {
         mod = stringParam + ">";
     }
     return mod;
+}
+
+function splitTrim(string, split) {
+    var array = string.split(split);
+    for(var i = 0; i < array.length; i++) {
+        array[i] = array[i].trim();
+    }
+    return array;
 }

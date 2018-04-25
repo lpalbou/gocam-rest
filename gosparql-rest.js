@@ -12,12 +12,12 @@ exports.handler = function (event, context, callback) {
     let property = event.property;
 
     let gocams = event.gocams;
-    if(gocams) {
-//        console.log("gocams:", gocams);
+    if (gocams) {
+        //        console.log("gocams:", gocams);
         gocams = splitTrim(gocams, ",", "<http://model.geneontology.org/", ">");
-//        console.log(gocams.reduce(concat));
+        //        console.log(gocams.reduce(concat));
     }
-    
+
     if (!resource) {
         callback("Missing <property> parameter");
     }
@@ -72,7 +72,7 @@ function handleUsers(parameter, property, callback) {
                 break;
             default:
                 url = baseUrl + SPARQL_UserMetaData(parameter);
-                GetJSON(url, transformUser, callback);
+                GetJSON(url, transformUserMeta, callback);
                 break;
         }
     }
@@ -127,6 +127,10 @@ function handleModels(parameter, property, gocams, callback) {
                 case "bps":
                     url = baseUrl + SPARQL_GetModelsBPs(gocams);
                     GetJSON(url, transformModelsBPs, callback);
+                    break;
+                case "gos":
+                    url = baseUrl + SPARQL_GetModelsGOs(gocams);
+                    GetJSON(url, transformModelsGOs, callback);
                     break;
                 default:
                     url = baseUrl + SPARQL_GetModel(parameter);
@@ -244,8 +248,8 @@ function transformLastModels(json, resultCallback) {
             "gocam": item.id.value,
             "date": item.date.value,
             "title": item.title.value,
-            "orcids": item.orcids? item.orcids.value.split(separator) : "N/A",
-            "names": item.names? item.names.value.split(separator) : "N/A"
+            "orcids": item.orcids ? item.orcids.value.split(separator) : "N/A",
+            "names": item.names ? item.names.value.split(separator) : "N/A"
         }
     });
 
@@ -256,9 +260,23 @@ function transformModelsBPs(json, resultCallback) {
     var jsmodified = json.map(function (item) {
         return {
             "gocam": item.models.value,
-            "bpids": item.bpIDs? item.bpIDs.value.split(separator) : "N/A",
-            "bpnames": item.bpNames? item.bpNames.value.split(separator) : "N/A",
-            "definitions": item.definitions? item.definitions.value.split(separator) : "N/A"
+            "bpids": item.bpIDs ? item.bpIDs.value.split(separator) : "N/A",
+            "bpnames": item.bpNames ? item.bpNames.value.split(separator) : "N/A",
+            "definitions": item.definitions ? item.definitions.value.split(separator) : "N/A"
+        }
+    });
+
+    resultCallback(null, jsmodified);
+}
+
+function transformModelsGOs(json, resultCallback) {
+    var jsmodified = json.map(function (item) {
+        return {
+            "gocam": item.models.value,
+            "goclasses": item.goclasses ? item.goclasses.value.split(separator) : "N/A",
+            "goids": item.goids ? item.goids.value.split(separator) : "N/A",
+            "gonames": item.gonames ? item.gonames.value.split(separator) : "N/A",
+            "definitions": item.definitions ? item.definitions.value.split(separator) : "N/A"
         }
     });
 
@@ -267,20 +285,21 @@ function transformModelsBPs(json, resultCallback) {
 
 
 /* used to transform the user data received by the SPARQL query and send the transformed JSON to resultCallBack */
-function transformUser(json, resultCallback) {
+function transformUserMeta(json, resultCallback) {
     var jsmodified = json.map(function (item) {
         return {
-            "name": item.name? item.name.value : item.orcid.value,
+            "name": item.name ? item.name.value : item.orcid.value,
             "organizations": item.organizations ? item.organizations.value.split(separator) : "N/A",
+            "affiliationsIRI": item.affiliationsIRI ? item.affiliationsIRI.value.split(separator) : "N/A",
             "affiliations": item.affiliations ? item.affiliations.value.split(separator) : "N/A",
-            "gocams": item.gocams? item.gocams.value.split(separator) : "N/A",
-            "gocamsDate": item.gocamsDate? item.gocamsDate.value.split(separator) : "N/A",
-            "gocamsTitle": item.gocamsTitle? splitTrim(item.gocamsTitle.value, separator) : "N/A",
-            "gpNames": item.gpNames? item.gpNames.value.split(separator) : "N/A",
-            "gpIDs": item.gpIDs? item.gpIDs.value.split(separator) : "N/A",
-            "bpNames": item.bpNames? item.bpNames.value.split(separator) : "N/A",
-            "bpIDs": item.bpIDs? item.bpIDs.value.split(separator) : "N/A",
-            "speciesList": item.speciesList? item.speciesList.value.split(separator) : "N/A"
+            "gocams": item.gocams ? item.gocams.value.split(separator) : "N/A",
+            "gocamsDate": item.gocamsDate ? item.gocamsDate.value.split(separator) : "N/A",
+            "gocamsTitle": item.gocamsTitle ? splitTrim(item.gocamsTitle.value, separator) : "N/A",
+            "species": item.species ? item.species.value.split(separator) : "N/A",
+            "gpNames": item.gpNames ? item.gpNames.value.split(separator) : "N/A",
+            "gpIDs": item.gpIDs ? item.gpIDs.value.split(separator) : "N/A",
+            "bpNames": item.bpNames ? item.bpNames.value.split(separator) : "N/A",
+            "bpIDs": item.bpIDs ? item.bpIDs.value.split(separator) : "N/A"
         }
     });
 
@@ -324,11 +343,11 @@ function transformGroupList(json, resultCallback) {
             "name": item.name.value,
             "url": item.url ? item.url.value : "N/A",
             "members": item.members ? item.members.value : 0,
-            "gocams": item.gocams? item.gocams.value : 0,
+            "gocams": item.gocams ? item.gocams.value : 0,
         }
     });
 
-    resultCallback(null, jsmodified);    
+    resultCallback(null, jsmodified);
 }
 
 
@@ -338,28 +357,30 @@ function transformGroupListDetails(json, resultCallback) {
             "name": item.name.value,
             "url": item.url ? item.url.value : "N/A",
             "membersOrcid": item.membersOrcid ? item.membersOrcid.value.split(separator) : "N/A",
-            "membersName": item.membersName? item.membersName.value.split(separator) : "N/A",
-            "modelsList": item.modelsList? item.modelsList.value.split(separator) : "N/A",
-            "titlesList": item.titlesList? splitTrim(item.titlesList.value, separator) : "N/A",
+            "membersName": item.membersName ? item.membersName.value.split(separator) : "N/A",
+            "modelsList": item.modelsList ? item.modelsList.value.split(separator) : "N/A",
+            "titlesList": item.titlesList ? splitTrim(item.titlesList.value, separator) : "N/A",
         }
     });
 
-    resultCallback(null, jsmodified);    
+    resultCallback(null, jsmodified);
 }
 
 
 function transformModelList(json, resultCallback) {
     var jsmodified = json.map(function (item) {
         return {
-            "gocam": item.id.value,
+            "gocam": item.gocam.value,
             "date": item.date.value,
             "title": item.title.value.trim(),
             "orcids": item.orcids ? item.orcids.value.split(separator) : "N/A",
-            "names": item.names ? item.names.value.split(separator) : "N/A"
+            "names": item.names ? item.names.value.split(separator) : "N/A",
+            "groupids": item.groupIDs ? item.groupIDs.value.split(separator) : "N/A",
+            "groupnames": item.groupNames ? item.groupNames.value.split(separator) : "N/A"
         }
     });
 
-    resultCallback(null, jsmodified);    
+    resultCallback(null, jsmodified);
 }
 
 
@@ -558,6 +579,8 @@ function SPARQL_LastModels(number) {
     return "?query=" + encoded;
 }
 
+
+
 /* Get the Detailed Information about a User 
     SYNGO: does require for now post-processing of the results
             with the SynGO user - mapping */
@@ -568,6 +591,7 @@ function SPARQL_UserMetaData(orcid) {
     PREFIX metago: <http://model.geneontology.org/>
     PREFIX dc: <http://purl.org/dc/elements/1.1/>
     PREFIX rdfs:<http://www.w3.org/2000/01/rdf-schema#> 
+	PREFIX vcard: <http://www.w3.org/2006/vcard/ns#>
 	PREFIX has_affiliation: <http://purl.obolibrary.org/obo/ERO_0000066> 
 	PREFIX enabled_by: <http://purl.obolibrary.org/obo/RO_0002333>
 	PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
@@ -578,23 +602,26 @@ function SPARQL_UserMetaData(orcid) {
     PREFIX CC: <http://purl.obolibrary.org/obo/GO_0005575>
 
     SELECT  ?name 	(GROUP_CONCAT(distinct ?organization;separator="` + separator + `") AS ?organizations) 
+					(GROUP_CONCAT(distinct ?affiliationIRI;separator="` + separator + `") AS ?affiliationsIRI) 
 					(GROUP_CONCAT(distinct ?affiliation;separator="` + separator + `") AS ?affiliations) 
-					(GROUP_CONCAT(distinct ?camId;separator="` + separator + `") AS ?gocams)
-					(GROUP_CONCAT(distinct ?camTitle;separator="` + separator + `") AS ?gocamsTitle)
-					(GROUP_CONCAT(distinct ?date;separator="` + separator + `") AS ?gocamsDate)
-					(GROUP_CONCAT(distinct ?gpName;separator="` + separator + `") AS ?gpNames)
+					(GROUP_CONCAT(distinct ?gocam;separator="` + separator + `") AS ?gocams)
+					(GROUP_CONCAT(distinct ?title;separator="` + separator + `") AS ?gocamsTitle)
+					(GROUP_CONCAT(?date;separator="` + separator + `") AS ?gocamsDate)
+					(GROUP_CONCAT(distinct ?spec;separator="` + separator + `") AS ?species)
+
 					(GROUP_CONCAT(distinct ?identifier;separator="` + separator + `") AS ?gpIDs)
-					(GROUP_CONCAT(distinct ?species;separator="` + separator + `") AS ?speciesList)
+					(GROUP_CONCAT(distinct ?gpName;separator="` + separator + `") AS ?gpNames)
 					(GROUP_CONCAT(distinct ?GO;separator="` + separator + `") AS ?bpIDs)
 					(GROUP_CONCAT(distinct ?GOLabel;separator="` + separator + `") AS ?bpNames)
         WHERE 
         {
-            BIND(` + modOrcid + ` as ?orcid) .
+#            BIND(` + modOrcid + ` as ?orcid) .
 #  			BIND("SynGO:SynGO-pim"^^xsd:string as ?orcid) .
-#  			BIND("http://orcid.org/0000-0001-7476-6306"^^xsd:string as ?orcid)
+  			BIND("http://orcid.org/0000-0001-7476-6306"^^xsd:string as ?orcid)
   
   			BIND(IRI(?orcid) as ?orcidIRI) .
   
+  			# Just find the label of current BP, MF and CC classes
             VALUES ?GO_classes { BP: MF: CC:  } .
    		    {
      		  SELECT * WHERE { ?GO_classes rdfs:label ?GO_class . }
@@ -602,27 +629,29 @@ function SPARQL_UserMetaData(orcid) {
 
            
   			# Getting some information on the model
-		  	GRAPH ?cam {
-			    ?cam metago:graphType metago:noctuaCam .
-  				?cam dc:date ?date .
-  				?cam dc:title ?camTitle .
+		  	GRAPH ?gocam {
+			    ?gocam 	metago:graphType metago:noctuaCam ;
+  						dc:date ?date ;
+  						dc:title ?title ;
+        				dc:contributor ?orcid .
+    
         		?id rdf:type ?identifier .
-		        FILTER(?identifier != owl:NamedIndividual) .
-    
-			    optional { ?cam obo:id ?camId . }
-    
+		        FILTER(?identifier != owl:NamedIndividual) .    
     			?GO rdf:type owl:Class .
   			}
+  
   
   			# Getting some information on the contributor
             optional { ?orcidIRI rdfs:label ?name } .
   			BIND(IF(bound(?name), ?name, ?orcid) as ?name) .
-            optional { ?orcidIRI <http://www.w3.org/2006/vcard/ns#organization-name> ?organization } .
-            optional { ?orcidIRI has_affiliation: ?affiliation } .
+            optional { ?orcidIRI vcard:organization-name ?organization } .
+            optional { 
+    			?orcidIRI has_affiliation: ?affiliationIRI .
+    			?affiliationIRI rdfs:label ?affiliation
+  			} .
   
   
-  
-  			# Getting some information on the model GPs
+  			# Getting GPs information
   			?identifier obo:id ?obj .
   			?oboid obo:id ?obj .
 		    FILTER (contains(str(?oboid), "/obo/")) .    
@@ -631,17 +660,20 @@ function SPARQL_UserMetaData(orcid) {
       		?v0 owl:onProperty <http://purl.obolibrary.org/obo/RO_0002162> . 
       		?v0 owl:someValuesFrom ?taxon .
       
-      		?oboid rdfs:label ?gpName .
-      		?taxon rdfs:label ?species .
-
-          ?GO rdfs:subClassOf+ ?GO_classes .
-  		  ?GO rdfs:label ?GOLabel .
-		  {
-    		SELECT * where {
-	  	  		filter(?GO_classes = BP:) .
-		    }
-  		  }
   
+  			# Get species information
+      		?oboid rdfs:label ?gpName .
+      		?taxon rdfs:label ?spec .
+
+  
+  			# Get BP information
+            ?GO rdfs:subClassOf+ ?GO_classes .
+    		?GO rdfs:label ?GOLabel .
+		    {
+    		  SELECT * where {
+	  	  		filter(?GO_classes = BP:) .
+		      }
+  		    }
     }
     GROUP BY ?orcid ?name 
     `);
@@ -682,40 +714,69 @@ function SPARQL_UserList() {
 
 
 /* SYNGO: works but the title are not expressive */
-function SPARQL_ModelList() { 
+function SPARQL_ModelList() {
     var encoded = encodeURIComponent(`
     PREFIX metago: <http://model.geneontology.org/>
     PREFIX dc: <http://purl.org/dc/elements/1.1/>
     PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#> 
 	PREFIX obo: <http://www.geneontology.org/formats/oboInOwl#>
+    PREFIX providedBy: <http://purl.org/pav/providedBy>
+
+      
+SELECT  ?gocam ?date ?title (GROUP_CONCAT(?orcid;separator="` + separator + `") AS ?orcids) 
+                            (GROUP_CONCAT(?name;separator="` + separator + `") AS ?names)
+							(GROUP_CONCAT(distinct ?providedBy;separator="` + separator + `") AS ?groupIDs) 
+							(GROUP_CONCAT(distinct ?providedByLabel;separator="` + separator + `") AS ?groupNames) 
         
-        SELECT  ?id ?date ?title    (GROUP_CONCAT(?orcid;separator="` + separator + `") AS ?orcids) 
-                                    (GROUP_CONCAT(?name;separator="` + separator + `") AS ?names)
-        WHERE 
-        {
-          	GRAPH ?cam {
+WHERE 
+{
+  		{
+          	GRAPH ?gocam {
                             
-	            ?cam metago:graphType metago:noctuaCam .
+	            ?gocam metago:graphType metago:noctuaCam .
               
-        	    ?cam dc:title ?title ;
+        	    ?gocam dc:title ?title ;
     	             dc:date ?date ;
-        	         dc:contributor ?orcid .
-            
+        	         dc:contributor ?orcid ;
+    				 providedBy: ?providedBy .
+    
 	            BIND( IRI(?orcid) AS ?orcidIRI ).
-          
-    	      	optional { ?cam obo:id ?id }
-        	
-              	# Baby Proofing the query since oboInOwl#id is not always there
-	  			BIND(IF(bound(?id), ?id, concat("gomodel:", substr(str(?cam), 31))) as ?id) .
-          
+	            BIND( IRI(?providedBy) AS ?providedByIRI ).
           }
-          
+  
+         
+  		  optional {
+		  	?providedByIRI rdfs:label ?providedByLabel .
+  		  }
+  
           optional { ?orcidIRI rdfs:label ?name }
 	  	  BIND(IF(bound(?name), ?name, ?orcid) as ?name) .
-
-        }   
-    GROUP BY ?id ?date ?title ?cam
-    ORDER BY DESC(?date)
+  }   
+  
+  # for the models NOT having a providedBy (take 100-200ms more...)
+  UNION {
+           	
+    GRAPH ?gocam {                                   
+      ?gocam metago:graphType metago:noctuaCam . 
+      optional {
+        ?gocam providedBy: ?providedBy .			
+      }
+      FILTER (!BOUND(?providedBy))
+      
+      ?gocam dc:title ?title ;
+             dc:date ?date ;
+             dc:contributor ?orcid .
+      
+      BIND( IRI(?orcid) AS ?orcidIRI ).
+    } 
+    
+    optional { ?orcidIRI rdfs:label ?name }	
+    BIND(IF(bound(?name), ?name, ?orcid) as ?name) .
+  }
+  
+}
+GROUP BY ?gocam ?date ?title 
+ORDER BY DESC(?date)
     `);
     return "?query=" + encoded;
 }
@@ -1073,16 +1134,12 @@ function SPARQL_GetModelsBPs(gocams) {
     PREFIX MF: <http://purl.obolibrary.org/obo/GO_0003674>
     PREFIX CC: <http://purl.obolibrary.org/obo/GO_0005575>
 
-    SELECT  ?cam (GROUP_CONCAT(?GO;separator="` + separator + `") as ?bpIDs) 
+    SELECT  ?models (GROUP_CONCAT(?GO;separator="` + separator + `") as ?bpIDs) 
 				(GROUP_CONCAT(?label;separator="` + separator + `") as ?bpNames)
 				(GROUP_CONCAT(?definition;separator="` + separator + `") as ?definitions)
     WHERE {
   			values ?models { ` + models + ` }
   
-  		  {
-    		BIND(concat("gomodel:", substr(str(?models), 31)) as ?cam) .
-		  }
-
           VALUES ?GO_classes { BP: MF: CC:  } .
    		  {
      		SELECT * WHERE { ?GO_classes rdfs:label ?GO_class . }
@@ -1101,10 +1158,56 @@ function SPARQL_GetModelsBPs(gocams) {
 		    }
   		  }
     }
-    GROUP BY ?cam
+    GROUP BY ?models
     `);
     return "?query=" + encoded;
 }
+
+
+/* ids must be full URI of go-cams */
+function SPARQL_GetModelsGOs(gocams) {
+    // Transform the array in string
+    var models = gocams.reduce(concat);
+
+    var encoded = encodeURIComponent(`
+	PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+    PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+    PREFIX metago: <http://model.geneontology.org/>
+	PREFIX owl: <http://www.w3.org/2002/07/owl#>
+    PREFIX definition: <http://purl.obolibrary.org/obo/IAO_0000115>
+    PREFIX BP: <http://purl.obolibrary.org/obo/GO_0008150>
+    PREFIX MF: <http://purl.obolibrary.org/obo/GO_0003674>
+    PREFIX CC: <http://purl.obolibrary.org/obo/GO_0005575>
+
+    SELECT  ?models 
+ 					(GROUP_CONCAT(?GO_classes;separator="` + separator + `") as ?goclasses)
+					(GROUP_CONCAT(?GO;separator="` + separator + `") as ?goids) 
+					(GROUP_CONCAT(?label;separator="` + separator + `") as ?gonames)
+					(GROUP_CONCAT(?definition;separator="` + separator + `") as ?definitions)
+    WHERE {
+		  values ?models { ` + models + `}
+  
+          VALUES ?GO_classes { BP: MF: CC:  } .
+   		  {
+     		SELECT * WHERE { ?GO_classes rdfs:label ?GO_class . }
+   		  }
+
+  		  GRAPH ?models {
+            ?GO rdf:type owl:Class .
+          }
+          ?GO rdfs:subClassOf+ ?GO_classes .
+  		  ?GO rdfs:label ?label .
+  		  ?GO definition: ?definition .
+
+            FILTER (LANG(?label) != "en") 
+#          ?GO_classes rdfs:label ?goclass .
+  
+    }
+    GROUP BY ?models
+    `);
+    return "?query=" + encoded;
+}
+
 
 /* OLD QUERY, BUT FAST
 
@@ -1498,11 +1601,11 @@ function getOrcid(orcid) {
     var re = /[\d]+[-][\d]+/;
 
     var modOrcid = orcid;
-    if(re.test(orcid)) {
+    if (re.test(orcid)) {
         modOrcid = "http://orcid.org/" + orcid;
     }
     modOrcid = "\"" + modOrcid + "\"^^xsd:string";
-    return modOrcid;    
+    return modOrcid;
 }
 
 function getURI(stringParam) {
@@ -1517,12 +1620,12 @@ function getURI(stringParam) {
 }
 
 function splitTrim(string, split, prefix, suffix) {
-    if(!prefix)
+    if (!prefix)
         prefix = "";
-    if(!suffix)
+    if (!suffix)
         suffix = "";
     var array = string.split(split);
-    for(var i = 0; i < array.length; i++) {
+    for (var i = 0; i < array.length; i++) {
         array[i] = prefix + array[i].trim() + suffix;
     }
     return array;
